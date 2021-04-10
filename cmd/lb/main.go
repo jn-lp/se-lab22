@@ -2,13 +2,19 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/jn-lp/se-lab22/httptools"
 	"github.com/jn-lp/se-lab22/signal"
 )
+
+var serversPool = []string{
+	"server1:8080",
+	"server2:8080",
+	"server3:8080",
+}
 
 var (
 	port = flag.Int(
@@ -34,35 +40,25 @@ var (
 	)
 )
 
+func scheme() string {
+	if *https {
+		return "https"
+	}
+	return "http"
+}
+
 func main() {
 	flag.Parse()
 
-	// TODO: Використовуйте дані про стан сервреа, щоб підтримувати список тих серверів, яким можна відправляти ззапит.
-	for _, server := range serversPool {
-		server := server
-		go func() {
-			for range time.Tick(10 * time.Second) {
-				alive, err := health(server)
-				if err != nil {
-					return
-				}
-				log.Println(server, alive)
-			}
-		}()
+	lb := NewLoadBalancer(time.Duration(*timeoutSec) * time.Second)
+	lb.SetServers(serversPool...)
+
+	err := lb.Start(10 * time.Second)
+	if err != nil {
+		fmt.Printf("%v", err)
 	}
 
-	frontend := httptools.CreateServer(
-		*port,
-		http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			// TODO: Рееалізуйте свій алгоритм балансувальника.
-			err := forward(serversPool[0], rw, r)
-			if err != nil {
-				rw.WriteHeader(http.StatusInternalServerError)
-
-				return
-			}
-		}),
-	)
+	frontend := httptools.CreateServer(*port, *lb)
 
 	log.Println("Starting load balancer...")
 	log.Printf("Tracing support enabled: %t", *traceEnabled)

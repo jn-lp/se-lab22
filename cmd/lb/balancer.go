@@ -3,39 +3,116 @@ package main
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"time"
+
+	"github.com/jn-lp/se-lab22/server"
 )
 
-var (
-	timeout     = time.Duration(*timeoutSec) * time.Second
-	serversPool = []string{
-		"server1:8080",
-		"server2:8080",
-		"server3:8080",
-	}
+var author = "rapid"
 
-	reqCount = 0
-)
+type LoadBalancer struct {
+	pool    []*server.Server
+	timeout time.Duration
 
-func scheme() string {
-	if *https {
-		return "https"
-	}
-	return "http"
+	reqCount int
 }
 
-func health(dst string) (bool, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+func NewLoadBalancer(timeout time.Duration) *LoadBalancer {
+	return &LoadBalancer{
+		timeout: timeout,
+	}
+}
+
+func (l LoadBalancer) SetServers(urls ...string) {
+	for _, rawUrl := range urls {
+		u, _ := url.Parse(rawUrl)
+		l.pool = append(l.pool, server.New(u))
+	}
+}
+
+func (l LoadBalancer) Start(healthEvery time.Duration) error {
+	for i, srv := range l.pool {
+		serverToCheck := srv
+		i := i
+		go func() {
+			for range time.Tick(healthEvery) {
+				alive, err := l.health(serverToCheck.String())
+				if err != nil {
+					continue
+				}
+				l.pool[i].SetAlive(alive)
+			}
+		}()
+	}
+
+	return nil
+}
+
+func (l LoadBalancer) Proxy(rw http.ResponseWriter, r *http.Request) error {
+	ctx, cancel := context.WithTimeout(r.Context(), l.timeout)
+	defer cancel()
+
+	dst := l.pick(r.URL).URL
+
+	fwdRequest := r.Clone(ctx)
+	fwdRequest.URL = dst
+	fwdRequest.Host = dst.Host
+
+	fwdRequest.Header.Set("lb-author", author)
+	fwdRequest.Header.Set("lb-req-cnt", strconv.Itoa(l.reqCount))
+
+	resp, err := http.DefaultClient.Do(fwdRequest)
+	if err != nil {
+		log.Printf("Failed to get response from %s: %s", dst, err)
+		rw.WriteHeader(http.StatusServiceUnavailable)
+
+		return err
+	}
+
+	for k, values := range resp.Header {
+		for _, value := range values {
+			rw.Header().Add(k, value)
+		}
+	}
+
+	if *traceEnabled {
+		rw.Header().Set("lb-from", dst.Host)
+	}
+	log.Println("fwd", resp.StatusCode, resp.Request.URL)
+	rw.WriteHeader(resp.StatusCode)
+
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+	}(resp.Body)
+
+	_, err = io.Copy(rw, resp.Body)
+	if err != nil {
+		log.Printf("Failed to write response: %s", err)
+	}
+
+	return nil
+}
+
+func (l LoadBalancer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+	if err := l.Proxy(rw, r); err != nil {
+		log.Printf("Got error proxying request: %v", err)
+	}
+}
+
+func (l LoadBalancer) health(dst string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), l.timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(
 		ctx,
 		"GET",
-		fmt.Sprintf("%s://%s/health", scheme(), dst),
+		fmt.Sprintf("%s/health", dst),
 		nil,
 	)
 	if err != nil {
@@ -54,49 +131,15 @@ func health(dst string) (bool, error) {
 	return true, nil
 }
 
-func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
-	reqCount++
+func (l LoadBalancer) pick(url *url.URL) *server.Server {
+	return l.pool[hash(url.Path)%uint32(len(l.pool))]
+}
 
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
-	defer cancel()
-
-	fwdRequest := r.Clone(ctx)
-	fwdRequest.RequestURI = ""
-	fwdRequest.URL.Host = dst
-	fwdRequest.URL.Scheme = scheme()
-	fwdRequest.Host = dst
-
-	fwdRequest.Header.Set("lb-author", "rapid")
-	fwdRequest.Header.Set("lb-req-cnt", strconv.Itoa(reqCount))
-
-	resp, err := http.DefaultClient.Do(fwdRequest)
+func hash(s string) uint32 {
+	h := fnv.New32a()
+	_, err := h.Write([]byte(s))
 	if err != nil {
-		log.Printf("Failed to get response from %s: %s", dst, err)
-		rw.WriteHeader(http.StatusServiceUnavailable)
-
-		return err
+		return 0
 	}
-
-	for k, values := range resp.Header {
-		for _, value := range values {
-			rw.Header().Add(k, value)
-		}
-	}
-
-	if *traceEnabled {
-		rw.Header().Set("lb-from", dst)
-	}
-	log.Println("fwd", resp.StatusCode, resp.Request.URL)
-	rw.WriteHeader(resp.StatusCode)
-
-	defer func(Body io.ReadCloser) {
-		err = Body.Close()
-	}(resp.Body)
-
-	_, err = io.Copy(rw, resp.Body)
-	if err != nil {
-		log.Printf("Failed to write response: %s", err)
-	}
-
-	return nil
+	return h.Sum32()
 }
