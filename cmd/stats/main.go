@@ -9,15 +9,13 @@ import (
 	"time"
 )
 
-var https = flag.Bool("https", false, "whether backends support HTTPs")
-
 var serversPool = []string{
 	"localhost:8080",
 	"localhost:8081",
 	"localhost:8082",
 }
 
-type report map[string][]string
+var https = flag.Bool("https", false, "whether backends support HTTPs")
 
 func scheme() string {
 	if *https {
@@ -26,11 +24,14 @@ func scheme() string {
 	return "http"
 }
 
-func main()  {
+type report map[string][]string
+
+func main() {
 	flag.Parse()
 
-	client := new(http.Client)
-	client.Timeout = 10 * time.Second
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 
 	res := make([]report, len(serversPool))
 	for i, s := range serversPool {
@@ -38,7 +39,7 @@ func main()  {
 		if err == nil {
 			var data report
 			if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-				//log.Printf("error parsing froom %s: %s", s, err)
+				// log.Printf("error parsing report %s: %s", s, err)
 			} else {
 				for k, v := range data {
 					l := len(v)

@@ -8,19 +8,25 @@ import (
 	"time"
 )
 
-var target = flag.String("target", "http://localhost:8090", "request target")
+var target = flag.String(
+	"target",
+	"http://localhost:8090",
+	"request target",
+)
 
 func main() {
 	flag.Parse()
-	client := new(http.Client)
-	client.Timeout = 10 * time.Second
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
 
 	for range time.Tick(1 * time.Second) {
 		resp, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", *target))
-		if err == nil {
-			log.Printf("response %d", resp.StatusCode)
-		} else {
+		if err != nil {
 			log.Printf("error %s", err)
+			continue
 		}
+		log.Printf("response %d", resp.StatusCode)
 	}
 }
