@@ -24,6 +24,8 @@ var port = flag.Int(
 )
 
 func main() {
+	flag.Parse()
+
 	h := http.NewServeMux()
 
 	h.HandleFunc(
