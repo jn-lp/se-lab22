@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -16,6 +19,11 @@ var (
 		"server1:8080",
 		"server2:8080",
 		"server3:8080",
+	}
+	serversMask = []bool{
+		false,
+		false,
+		false,
 	}
 
 	reqCount = 0
@@ -55,6 +63,9 @@ func health(dst string) (bool, error) {
 }
 
 func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
+	if dst == "" {
+		return errors.New("no destination available")
+	}
 	reqCount++
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
@@ -99,4 +110,30 @@ func forward(dst string, rw http.ResponseWriter, r *http.Request) error {
 	}
 
 	return nil
+}
+
+func hash(s string) uint64 {
+	hash := sha1.Sum([]byte(s))
+	return binary.BigEndian.Uint64(hash[:8])
+}
+
+func pickServer(r *http.Request, servers []string, mask []bool) string {
+	count := 0
+	for _, allowed := range mask {
+		if allowed {
+			count++
+		}
+	}
+	if count == 0 {
+		return ""
+	}
+	nonce := 0
+	for true {
+		index := hash(r.RequestURI+strconv.Itoa(nonce)) % uint64(len(servers))
+		if mask[index] {
+			return servers[index]
+		}
+		nonce++
+	}
+	return ""
 }

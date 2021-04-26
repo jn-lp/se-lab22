@@ -37,8 +37,8 @@ var (
 func main() {
 	flag.Parse()
 
-	// TODO: Використовуйте дані про стан сервреа, щоб підтримувати список тих серверів, яким можна відправляти ззапит.
-	for _, server := range serversPool {
+	for i, server := range serversPool {
+		i := i
 		server := server
 		go func() {
 			for range time.Tick(10 * time.Second) {
@@ -46,6 +46,7 @@ func main() {
 				if err != nil {
 					return
 				}
+				serversMask[i] = alive
 				log.Println(server, alive)
 			}
 		}()
@@ -54,8 +55,7 @@ func main() {
 	frontend := httptools.CreateServer(
 		*port,
 		http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-			// TODO: Рееалізуйте свій алгоритм балансувальника.
-			err := forward(serversPool[0], rw, r)
+			err := forward(pickServer(r, serversPool, serversMask), rw, r)
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
 
