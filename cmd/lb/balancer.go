@@ -141,8 +141,22 @@ func (l *LoadBalancer) health(dst string) (bool, error) {
 
 func (l *LoadBalancer) pick(url *url.URL) (*server.Server, error) {
 	poolLen := len(l.pool)
+	aliveCount := 0
 
-	for nonce := 0; nonce < poolLen; nonce++ {
+	for _, srv := range l.pool {
+		if srv.Alive() {
+			aliveCount++
+		}
+	}
+	if aliveCount == 0 {
+		return nil, fmt.Errorf("no servers are alive")
+	}
+
+	// This loop may require too many cycles if low percentage of servers is alive
+	// If only 1% is alive arround 50% of request will require more than 70 cycles
+	// With 3 servers and worst case scenario of 33.(3)% it won't be that bad
+	// And solving this cutting edge case is beyond the scope of a task
+	for nonce := 0; true; nonce++ {
 		index := hash(url.RequestURI()+strconv.Itoa(nonce)) % uint64(poolLen)
 		if srv := l.pool[index]; srv.Alive() {
 			return srv, nil
