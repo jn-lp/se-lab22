@@ -129,7 +129,7 @@ func pickServer(r *http.Request, servers []string, mask []bool) string {
 	}
 	nonce := 0
 	for true {
-		index := hash(r.RequestURI+strconv.Itoa(nonce)) % uint64(len(servers))
+		index := hash(r.URL.RequestURI()+strconv.Itoa(nonce)) % uint64(len(servers))
 		if mask[index] {
 			return servers[index]
 		}
