@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/binary"
 	"fmt"
-	"hash/fnv"
 	"io"
 	"log"
 	"net/http"
@@ -29,14 +30,14 @@ func NewLoadBalancer(timeout time.Duration) *LoadBalancer {
 	}
 }
 
-func (l LoadBalancer) SetServers(urls ...string) {
+func (l *LoadBalancer) SetServers(urls ...string) {
 	for _, rawUrl := range urls {
 		u, _ := url.Parse(rawUrl)
 		l.pool = append(l.pool, server.New(u))
 	}
 }
 
-func (l LoadBalancer) Start(healthEvery time.Duration) error {
+func (l *LoadBalancer) Start(healthEvery time.Duration) error {
 	for i, srv := range l.pool {
 		serverToCheck := srv
 		i := i
@@ -54,15 +55,20 @@ func (l LoadBalancer) Start(healthEvery time.Duration) error {
 	return nil
 }
 
-func (l LoadBalancer) Proxy(rw http.ResponseWriter, r *http.Request) error {
+func (l *LoadBalancer) Proxy(rw http.ResponseWriter, r *http.Request) error {
 	ctx, cancel := context.WithTimeout(r.Context(), l.timeout)
 	defer cancel()
 
-	dst := l.pick(r.URL).URL
+	dst, err := l.pick(r.URL)
+	if err != nil {
+		return err
+	}
 
 	fwdRequest := r.Clone(ctx)
-	fwdRequest.URL = dst
-	fwdRequest.Host = dst.Host
+	fwdRequest.RequestURI = ""
+	fwdRequest.URL.Host = dst.URL.String()
+	fwdRequest.URL.Scheme = scheme()
+	fwdRequest.Host = dst.URL.String()
 
 	fwdRequest.Header.Set("lb-author", author)
 	fwdRequest.Header.Set("lb-req-cnt", strconv.Itoa(l.reqCount))
@@ -82,7 +88,7 @@ func (l LoadBalancer) Proxy(rw http.ResponseWriter, r *http.Request) error {
 	}
 
 	if *traceEnabled {
-		rw.Header().Set("lb-from", dst.Host)
+		rw.Header().Set("lb-from", dst.URL.Host)
 	}
 	log.Println("fwd", resp.StatusCode, resp.Request.URL)
 	rw.WriteHeader(resp.StatusCode)
@@ -99,29 +105,31 @@ func (l LoadBalancer) Proxy(rw http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (l LoadBalancer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
+func (l *LoadBalancer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if err := l.Proxy(rw, r); err != nil {
+		rw.WriteHeader(http.StatusServiceUnavailable)
 		log.Printf("Got error proxying request: %v", err)
 	}
+	l.reqCount += 1
 }
 
-func (l LoadBalancer) health(dst string) (bool, error) {
+func (l *LoadBalancer) health(dst string) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), l.timeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(
 		ctx,
 		"GET",
-		fmt.Sprintf("%s/health", dst),
+		fmt.Sprintf("%s://%s/health", scheme(), dst),
 		nil,
 	)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return false, nil
+		return false, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -131,15 +139,20 @@ func (l LoadBalancer) health(dst string) (bool, error) {
 	return true, nil
 }
 
-func (l LoadBalancer) pick(url *url.URL) *server.Server {
-	return l.pool[hash(url.Path)%uint32(len(l.pool))]
+func (l *LoadBalancer) pick(url *url.URL) (*server.Server, error) {
+	poolLen := len(l.pool)
+
+	for nonce := 0; nonce < poolLen; nonce++ {
+		index := hash(url.RequestURI()+strconv.Itoa(nonce)) % uint64(poolLen)
+		if srv := l.pool[index]; srv.Alive() {
+			return srv, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no servers are alive")
 }
 
-func hash(s string) uint32 {
-	h := fnv.New32a()
-	_, err := h.Write([]byte(s))
-	if err != nil {
-		return 0
-	}
-	return h.Sum32()
+func hash(s string) uint64 {
+	h := sha1.Sum([]byte(s))
+	return binary.BigEndian.Uint64(h[:8])
 }

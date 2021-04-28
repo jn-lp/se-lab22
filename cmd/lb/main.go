@@ -58,7 +58,7 @@ func main() {
 		fmt.Printf("%v", err)
 	}
 
-	frontend := httptools.CreateServer(*port, *lb)
+	frontend := httptools.CreateServer(*port, lb)
 
 	log.Println("Starting load balancer...")
 	log.Printf("Tracing support enabled: %t", *traceEnabled)
