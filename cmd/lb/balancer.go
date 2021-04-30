@@ -15,7 +15,11 @@ import (
 	"github.com/jn-lp/se-lab22/server"
 )
 
-var author = "rapid"
+var (
+	author = "rapid"
+
+	NoServersAreAlive = fmt.Errorf("no servers are alive")
+)
 
 type LoadBalancer struct {
 	pool    []*server.Server
@@ -149,11 +153,11 @@ func (l *LoadBalancer) pick(url *url.URL) (*server.Server, error) {
 		}
 	}
 	if aliveCount == 0 {
-		return nil, fmt.Errorf("no servers are alive")
+		return nil, NoServersAreAlive
 	}
 
 	// This loop may require too many cycles if low percentage of servers is alive
-	// If only 1% is alive arround 50% of request will require more than 70 cycles
+	// If only 1% is alive around 50% of request will require more than 70 cycles
 	// With 3 servers and worst case scenario of 33.(3)% it won't be that bad
 	// And solving this cutting edge case is beyond the scope of a task
 	for nonce := 0; true; nonce++ {
@@ -163,7 +167,7 @@ func (l *LoadBalancer) pick(url *url.URL) (*server.Server, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("no servers are alive")
+	return nil, NoServersAreAlive
 }
 
 func hash(s string) uint64 {

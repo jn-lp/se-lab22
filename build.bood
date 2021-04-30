@@ -8,15 +8,24 @@ go_binary {
   ]
 }
 
-go_binary {
+go_testedBinary {
   name: "lb",
   pkg: "github.com/jn-lp/se-lab22/cmd/lb",
   srcs: [
     "httptools/**/*.go",
+    "server/**/*.go",
     "signal/**/*.go",
     "cmd/lb/*.go"
-  ]
-  // TODO: Додайте запуск тестів для балансувальника.
+  ],
+  testPkg: "./cmd/lb/...",
+  testSrcs: ["./cmd/lb/*_test.go"]
 }
 
-// TODO: Додайте модуль для інтеграційних тестів.
+go_testedBinary {
+  name: "integration",
+  pkg: "github.com/jn-lp/se-lab22/cmd/client",
+  srcs: [ "cmd/client/*.go" ],
+  testPkg: "./integration/...",
+  testSrcs: ["./integration/*_test.go"],
+  optional: true
+}
