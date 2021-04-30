@@ -24,7 +24,40 @@ func (s *TestSuite) TestBalancer(c *C) {
 		ServersPool []*Server
 		ServerIndex int
 		WithError   bool
-	}{} {
+	}{
+		{
+			WithError: true,
+		},
+		{
+			ServersPool: []*Server{
+				{
+					alive: false,
+				},
+			},
+			WithError: true,
+		},
+		{
+			ServersPool: []*Server{
+				{
+					alive: true,
+				},
+			},
+			ServerIndex: 0,
+			WithError:   false,
+		},
+		{
+			ServersPool: []*Server{
+				{
+					alive: false,
+				},
+				{
+					alive: true,
+				},
+			},
+			ServerIndex: 1,
+			WithError:   false,
+		},
+	} {
 		lb := NewLoadBalancer(time.Duration(*timeoutSec) * time.Second)
 		lb.pool = test.ServersPool
 
