@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y ninja-build
 # TODO: Змініть на власну реалізацію системи збірки
 RUN go get -u github.com/jn-lp/se-lab21/build/cmd/bood
 
-WORKDIR /go/src/practice-2
+WORKDIR /go/src/se-lab22
 COPY . .
 
-ENTRYPOINT ["bood", "out/bin/integration", "out/reports/integration/report.log"]
+ENTRYPOINT ["bood", "out/report.log"]
