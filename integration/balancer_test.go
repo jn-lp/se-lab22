@@ -22,17 +22,17 @@ type IntegrationSuite struct{}
 var _ = Suite(&IntegrationSuite{})
 
 func (s *IntegrationSuite) TestBalancer(c *C) {
-	var responser string
+	var srv string
 	for i := 0; i < 9; i++ {
 		resp, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", baseAddress))
 		c.Assert(err, IsNil)
 
 		c.Assert(resp.StatusCode, Equals, http.StatusOK)
 
-		if from := resp.Header.Get("lb-from"); responser == "" {
-			responser = from
+		if from := resp.Header.Get("lb-from"); srv == "" {
+			srv = from
 		} else {
-			c.Assert(responser, Equals, from)
+			c.Assert(srv, Equals, from)
 		}
 	}
 }

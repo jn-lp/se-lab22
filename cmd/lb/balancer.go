@@ -11,8 +11,6 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-
-	"github.com/jn-lp/se-lab22/server"
 )
 
 var (
@@ -22,7 +20,7 @@ var (
 )
 
 type LoadBalancer struct {
-	pool    []*server.Server
+	pool    []*Server
 	timeout time.Duration
 
 	reqCount int
@@ -37,7 +35,7 @@ func NewLoadBalancer(timeout time.Duration) *LoadBalancer {
 func (l *LoadBalancer) SetServers(urls ...string) {
 	for _, rawUrl := range urls {
 		u, _ := url.Parse(rawUrl)
-		l.pool = append(l.pool, server.New(u))
+		l.pool = append(l.pool, New(u))
 	}
 }
 
@@ -143,7 +141,7 @@ func (l *LoadBalancer) health(dst string) (bool, error) {
 	return true, nil
 }
 
-func (l *LoadBalancer) pick(url *url.URL) (*server.Server, error) {
+func (l *LoadBalancer) pick(url *url.URL) (*Server, error) {
 	poolLen := len(l.pool)
 	aliveCount := 0
 

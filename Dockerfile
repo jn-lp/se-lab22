@@ -2,8 +2,7 @@ FROM golang:1.16 as build
 
 RUN apt-get update && apt-get install -y ninja-build
 
-# TODO: Змініть на власну реалізацію системи збірки
-RUN go get -u github.com/jn-lp/se-lab22/build/cmd/bood
+RUN go get -u github.com/jn-lp/se-lab21/build/cmd/bood
 
 WORKDIR /go/src/se-lab22
 COPY . .

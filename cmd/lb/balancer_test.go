@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jn-lp/se-lab22/server"
 	. "gopkg.in/check.v1"
 )
 
@@ -16,17 +15,23 @@ type TestSuite struct{}
 var _ = Suite(&TestSuite{})
 
 func (s *TestSuite) TestBalancer(c *C) {
+	URL, err := url.Parse("https://example.com:8080/uri")
+	if err != nil {
+		return
+	}
+
 	for _, test := range []struct {
-		URL         *url.URL
-		ServersPool []*server.Server
+		ServersPool []*Server
 		ServerIndex int
 		WithError   bool
 	}{} {
 		lb := NewLoadBalancer(time.Duration(*timeoutSec) * time.Second)
 		lb.pool = test.ServersPool
 
-		srv, err := lb.pick(test.URL)
+		srv, err := lb.pick(URL)
 		c.Assert(err != nil, Equals, test.WithError)
-		c.Assert(srv, Equals, test.ServersPool[test.ServerIndex])
+		if !test.WithError {
+			c.Assert(srv, Equals, test.ServersPool[test.ServerIndex])
+		}
 	}
 }
