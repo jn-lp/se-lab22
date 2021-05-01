@@ -15,7 +15,12 @@ var client = http.Client{
 	Timeout: 3 * time.Second,
 }
 
-func Test(t *testing.T) { TestingT(t) }
+func Test(t *testing.T) {
+	// Wait for servers to come up
+	time.Sleep(10 * time.Second)
+
+	TestingT(t)
+}
 
 type IntegrationSuite struct{}
 

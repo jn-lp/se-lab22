@@ -2,7 +2,10 @@ FROM golang:1.16 as build
 
 RUN apt-get update && apt-get install -y ninja-build
 
-RUN go get -u github.com/jn-lp/se-lab21/build/cmd/bood
+WORKDIR /go/src
+RUN git clone https://github.com/jn-lp/se-lab21
+WORKDIR /go/src/se-lab21
+RUN go get -u ./build/cmd/bood
 
 WORKDIR /go/src/se-lab22
 COPY . .
