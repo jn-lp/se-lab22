@@ -1,0 +1,5 @@
+go_testedBinary {
+  name: "integration",
+  pkg: "github.com/jn-lp/se-lab22/integration",
+  testPkg: "./..."
+}

@@ -1,11 +1,12 @@
-go_binary {
+go_testedBinary {
   name: "server",
   pkg: "github.com/jn-lp/se-lab22/cmd/server",
   srcs: [
     "httptools/**/*.go",
     "signal/**/*.go",
     "cmd/server/*.go"
-  ]
+  ],
+  testPkg: "./cmd/server/..."
 }
 
 go_testedBinary {
@@ -17,15 +18,5 @@ go_testedBinary {
     "signal/**/*.go",
     "cmd/lb/*.go"
   ],
-  testPkg: "./cmd/lb/...",
-  testSrcs: ["./cmd/lb/*_test.go"]
-}
-
-go_testedBinary {
-  name: "integration",
-  pkg: "github.com/jn-lp/se-lab22/cmd/client",
-  srcs: [ "cmd/client/*.go" ],
-  testPkg: "./integration/...",
-  testSrcs: ["./integration/*_test.go"],
-  optional: true
+  testPkg: "./cmd/lb/..."
 }
