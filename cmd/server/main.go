@@ -17,13 +17,13 @@ const (
 	confHealthFailure    = "CONF_HEALTH_FAILURE"
 )
 
-var port = flag.Int(
-	"port",
-	8080,
-	"server port",
-)
-
 func main() {
+	port := flag.Int(
+		"port",
+		8080,
+		"server port",
+	)
+
 	flag.Parse()
 
 	h := http.NewServeMux()
@@ -48,8 +48,8 @@ func main() {
 		"/api/v1/some-data",
 		func(rw http.ResponseWriter, r *http.Request) {
 			respDelayString := os.Getenv(confResponseDelaySec)
-			if delaySec, parseErr := strconv.Atoi(respDelayString);
-				parseErr == nil && delaySec > 0 && delaySec < 300 {
+
+			if delaySec, parseErr := strconv.Atoi(respDelayString); parseErr == nil && delaySec > 0 && delaySec < 300 {
 				time.Sleep(time.Duration(delaySec) * time.Second)
 			}
 

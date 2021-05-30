@@ -17,10 +17,12 @@ func (r Report) Process(req *http.Request) {
 
 	if author != "" {
 		list := r[author]
+
 		list = append(list, counter)
 		if len(list) > reportMaxLen {
 			list = list[len(list)-reportMaxLen:]
 		}
+
 		r[author] = list
 	}
 }
