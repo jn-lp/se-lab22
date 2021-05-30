@@ -147,12 +147,7 @@ func (s *segment) Close() error {
 }
 
 func (s *segment) operateEntries() {
-	for {
-		e, ok := <-s.entriesC
-		if !ok {
-			break
-		}
-
+	for e := range s.entriesC {
 		s.Lock()
 
 		n, err := s.rwsc.Write(e.Encode())
