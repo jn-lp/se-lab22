@@ -93,8 +93,7 @@ func (d *datastore) Recover() error {
 	for _, name := range segments {
 		var file *os.File
 
-		file, _, err = openFile(d.dir, name)
-		if err != nil {
+		if file, err = openFile(d.dir, name, os.O_APPEND|os.O_RDWR); err != nil {
 			return err
 		}
 
@@ -148,7 +147,7 @@ func (d *datastore) Put(key string, value []byte) error {
 		d.current = d.NewSegment()
 	}
 
-	if err := d.current.Write(entry{key: key, value: value}); err != nil {
+	if err := d.current.Write(key, value); err != nil {
 		return err
 	}
 
@@ -162,7 +161,7 @@ func (d *datastore) Delete(key string) error {
 func (d *datastore) NewSegment() Segment {
 	name := strconv.FormatInt(time.Now().UnixNano(), 10)
 
-	file, _, err := openFile(d.dir, name)
+	file, err := openFile(d.dir, name, os.O_APPEND|os.O_RDWR|os.O_CREATE)
 	if err != nil {
 		return nil
 	}

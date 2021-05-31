@@ -11,7 +11,7 @@ import (
 type Segment interface {
 	IsOpen() bool
 
-	Write(e entry) error
+	Write(key string, val []byte) error
 	Get(key string) (val []byte, err error)
 
 	Recover() error
@@ -37,6 +37,7 @@ type segment struct {
 
 	index    hashIndex
 	entriesC chan entry
+	errorsC  chan error
 	closed   bool
 }
 
@@ -46,6 +47,7 @@ func NewSegment(rwsc readWriteSeekCloser) Segment {
 
 		index:    make(hashIndex),
 		entriesC: make(chan entry),
+		errorsC:  make(chan error),
 	}
 
 	go s.operateEntries()
@@ -101,14 +103,14 @@ func (s *segment) IsOpen() bool {
 	return s.outOffset < bufSize
 }
 
-func (s *segment) Write(e entry) error {
+func (s *segment) Write(key string, val []byte) error {
 	if s.closed {
 		return ErrSegmentClosed
 	}
 
-	s.entriesC <- e
+	s.entriesC <- entry{key: key, value: val}
 
-	return nil
+	return <-s.errorsC
 }
 
 func (s *segment) Get(key string) ([]byte, error) {
@@ -143,7 +145,7 @@ func (s *segment) Close() error {
 	s.entriesC = nil
 	s.closed = true
 
-	return nil
+	return s.rwsc.Close()
 }
 
 func (s *segment) operateEntries() {
@@ -152,14 +154,14 @@ func (s *segment) operateEntries() {
 
 		n, err := s.rwsc.Write(e.Encode())
 		if err != nil {
+			s.errorsC <- err
 			continue
 		}
 
 		s.index[e.key] = s.outOffset
 		s.outOffset += int64(n)
 
+		s.errorsC <- nil
 		s.Unlock()
 	}
-
-	return
 }
