@@ -15,6 +15,7 @@ type Segment interface {
 	Get(key string) (val []byte, err error)
 
 	Recover() error
+	Snapshot() (values map[string][]byte, err error)
 
 	io.Closer
 }
@@ -134,6 +135,21 @@ func (s *segment) Get(key string) ([]byte, error) {
 	}
 
 	return value, nil
+}
+
+func (s *segment) Snapshot() (map[string][]byte, error) {
+	all := make(map[string][]byte)
+
+	for key := range s.index {
+		val, err := s.Get(key)
+		if err != nil {
+			return nil, err
+		}
+
+		all[key] = val
+	}
+
+	return all, nil
 }
 
 func (s *segment) Close() error {

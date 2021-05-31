@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"sync"
@@ -195,16 +196,72 @@ func (d *datastore) Close() error {
 	return nil
 }
 
-func (d *datastore) mergeSegments() {
+func (d *datastore) mergeSegments() error {
 	d.Lock()
 	defer d.Unlock()
 
 	if d.merging {
-		return
+		return errors.New("already merging")
 	}
 
 	d.merging = true
 	defer func() { d.merging = false }()
 
-	// TODO
+	values := make(map[string][]byte)
+	for _, s := range d.segments {
+		vals, err := s.Snapshot()
+		if err != nil {
+			return err
+		}
+
+		for key, val := range vals {
+			values[key] = val
+		}
+	}
+
+	file, err := openFile(d.dir, "root", os.O_APPEND|os.O_RDWR|os.O_CREATE)
+	if err != nil {
+		return err
+	}
+
+	s := NewSegment(file)
+
+	for key, val := range values {
+		if val == nil {
+			continue
+		}
+
+		if err = s.Write(key, val); err != nil {
+			return err
+		}
+	}
+
+	if err = s.Close(); err != nil {
+		return err
+	}
+
+	newName := strconv.FormatInt(time.Now().UnixNano(), 10)
+
+	if err = os.Rename(
+		filepath.Join(d.dir, "root"),
+		newName,
+	); err != nil {
+		return err
+	}
+
+	d.segments[newName] = s
+
+	for name := range d.segments {
+		if name == newName {
+			continue
+		}
+
+		if err = os.Remove(filepath.Join(d.dir, name)); err != nil {
+			return err
+		}
+
+		delete(d.segments, name)
+	}
+
+	return nil
 }
