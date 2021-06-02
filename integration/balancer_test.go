@@ -28,6 +28,7 @@ var _ = Suite(&IntegrationSuite{})
 
 func (s *IntegrationSuite) TestBalancer(c *C) {
 	var srv string
+
 	for i := 0; i < 9; i++ {
 		resp, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", baseAddress))
 		c.Assert(err, IsNil)

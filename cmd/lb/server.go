@@ -12,8 +12,8 @@ type Server struct {
 	alive bool
 }
 
-func New(URL *url.URL) *Server {
-	return &Server{URL: URL}
+func New(u *url.URL) *Server {
+	return &Server{URL: u}
 }
 
 func (s *Server) SetAlive(alive bool) {

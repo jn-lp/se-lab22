@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -13,11 +14,12 @@ import (
 	"time"
 )
 
-var (
+const (
 	author = "rapid"
-
-	NoServersAreAlive = fmt.Errorf("no servers are alive")
 )
+
+// ErrNoServersAreAlive for servers that are not alive from last pick.
+var ErrNoServersAreAlive = errors.New("no servers are alive")
 
 type LoadBalancer struct {
 	pool    []*Server
@@ -33,28 +35,29 @@ func NewLoadBalancer(timeout time.Duration) *LoadBalancer {
 }
 
 func (l *LoadBalancer) SetServers(urls ...string) {
-	for _, rawUrl := range urls {
-		u, _ := url.Parse(rawUrl)
+	for _, rawURL := range urls {
+		u, _ := url.Parse(rawURL)
 		l.pool = append(l.pool, New(u))
 	}
 }
 
-func (l *LoadBalancer) Start(healthEvery time.Duration) error {
+func (l *LoadBalancer) Start(healthEvery time.Duration) {
 	for i, srv := range l.pool {
 		serverToCheck := srv
-		i := i
+
+		j := i
+
 		go func() {
 			for range time.Tick(healthEvery) {
 				alive, err := l.health(serverToCheck.String())
 				if err != nil {
 					continue
 				}
-				l.pool[i].SetAlive(alive)
+
+				l.pool[j].SetAlive(alive)
 			}
 		}()
 	}
-
-	return nil
 }
 
 func (l *LoadBalancer) Proxy(rw http.ResponseWriter, r *http.Request) error {
@@ -92,12 +95,11 @@ func (l *LoadBalancer) Proxy(rw http.ResponseWriter, r *http.Request) error {
 	if *traceEnabled {
 		rw.Header().Set("lb-from", dst.URL.Host)
 	}
+
 	log.Println("fwd", resp.StatusCode, resp.Request.URL)
 	rw.WriteHeader(resp.StatusCode)
 
-	defer func(Body io.ReadCloser) {
-		err = Body.Close()
-	}(resp.Body)
+	_ = resp.Body.Close()
 
 	_, err = io.Copy(rw, resp.Body)
 	if err != nil {
@@ -112,7 +114,8 @@ func (l *LoadBalancer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusServiceUnavailable)
 		log.Printf("Got error proxying request: %v", err)
 	}
-	l.reqCount += 1
+
+	l.reqCount++
 }
 
 func (l *LoadBalancer) health(dst string) (bool, error) {
@@ -134,6 +137,8 @@ func (l *LoadBalancer) health(dst string) (bool, error) {
 		return false, err
 	}
 
+	_ = resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		return false, nil
 	}
@@ -150,8 +155,9 @@ func (l *LoadBalancer) pick(url *url.URL) (*Server, error) {
 			aliveCount++
 		}
 	}
+
 	if aliveCount == 0 {
-		return nil, NoServersAreAlive
+		return nil, ErrNoServersAreAlive
 	}
 
 	// This loop may require too many cycles if low percentage of servers is alive
@@ -165,10 +171,11 @@ func (l *LoadBalancer) pick(url *url.URL) (*Server, error) {
 		}
 	}
 
-	return nil, NoServersAreAlive
+	return nil, ErrNoServersAreAlive
 }
 
 func hash(s string) uint64 {
 	h := sha1.Sum([]byte(s))
+
 	return binary.BigEndian.Uint64(h[:8])
 }

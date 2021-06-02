@@ -1,29 +1,28 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
-	"strconv"
-	"time"
 
 	"github.com/jn-lp/se-lab22/httptools"
 	"github.com/jn-lp/se-lab22/signal"
 )
 
 const (
-	confResponseDelaySec = "CONF_RESPONSE_DELAY_SEC"
-	confHealthFailure    = "CONF_HEALTH_FAILURE"
-)
-
-var port = flag.Int(
-	"port",
-	8080,
-	"server port",
+	// confResponseDelaySec = "CONF_RESPONSE_DELAY_SEC"
+	confHealthFailure = "CONF_HEALTH_FAILURE"
 )
 
 func main() {
+	port := flag.Int(
+		"port",
+		8080,
+		"server port",
+	)
+
 	flag.Parse()
 
 	h := http.NewServeMux()
@@ -47,17 +46,34 @@ func main() {
 	h.HandleFunc(
 		"/api/v1/some-data",
 		func(rw http.ResponseWriter, r *http.Request) {
-			respDelayString := os.Getenv(confResponseDelaySec)
-			if delaySec, parseErr := strconv.Atoi(respDelayString);
-				parseErr == nil && delaySec > 0 && delaySec < 300 {
-				time.Sleep(time.Duration(delaySec) * time.Second)
+			key := r.FormValue("key")
+			if key == "" {
+				rw.WriteHeader(http.StatusNotFound)
+
+				return
 			}
 
-			report.Process(r)
+			reqURL := fmt.Sprintf("http://db:8080/db/%s", key)
 
-			rw.Header().Set("content-type", "application/json")
-			rw.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(rw).Encode([]string{"1", "2"})
+			resp, err := http.Get(reqURL)
+			if err != nil {
+				rw.WriteHeader(http.StatusInternalServerError)
+
+				return
+			}
+
+			for k, values := range resp.Header {
+				for _, value := range values {
+					rw.Header().Add(k, value)
+				}
+			}
+
+			rw.WriteHeader(resp.StatusCode)
+			defer resp.Body.Close()
+
+			if _, err = io.Copy(rw, resp.Body); err != nil {
+				return
+			}
 		},
 	)
 

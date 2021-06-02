@@ -9,37 +9,37 @@ import (
 	"time"
 )
 
-var serversPool = []string{
-	"localhost:8080",
-	"localhost:8081",
-	"localhost:8082",
-}
-
-var https = flag.Bool("https", false, "whether backends support HTTPs")
-
-func scheme() string {
-	if *https {
-		return "https"
-	}
-	return "http"
-}
-
 type report map[string][]string
 
 func main() {
+	https := flag.Bool("https", false, "whether backends support HTTPs")
+
 	flag.Parse()
+
+	scheme := "http"
+	if *https {
+		scheme = "http"
+	}
+
+	serversPool := []string{
+		"localhost:8080",
+		"localhost:8081",
+		"localhost:8082",
+	}
 
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
 
 	res := make([]report, len(serversPool))
+
 	for i, s := range serversPool {
-		resp, err := client.Get(fmt.Sprintf("%s://%s/report", scheme(), s))
+		resp, err := client.Get(fmt.Sprintf("%s://%s/report", scheme, s))
 		if err == nil {
 			var data report
-			if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-				// log.Printf("error parsing report %s: %s", s, err)
+
+			if err = json.NewDecoder(resp.Body).Decode(&data); err != nil {
+				log.Printf("error parsing report %s: %s", s, err)
 			} else {
 				for k, v := range data {
 					l := len(v)
@@ -54,10 +54,16 @@ func main() {
 			log.Printf("error %s %s", s, err)
 		}
 
+		if err = resp.Body.Close(); err != nil {
+			continue
+		}
+
 		log.Println("=========================")
 		log.Println("SERVER", i, serversPool[i])
 		log.Println("=========================")
+
 		data, _ := json.MarshalIndent(res[i], "", "  ")
+
 		log.Println(string(data))
 	}
 }
