@@ -2,6 +2,8 @@ package integration
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/assert"
+	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
@@ -10,6 +12,7 @@ import (
 )
 
 const baseAddress = "http://balancer:8090"
+const ourTeam = "rapid"
 
 var client = http.Client{
 	Timeout: 3 * time.Second,
@@ -26,27 +29,36 @@ type IntegrationSuite struct{}
 
 var _ = Suite(&IntegrationSuite{})
 
-func (s *IntegrationSuite) TestBalancer(c *C) {
-	var srv string
+func (s *IntegrationSuite) TestBalancer(t *testing.T) {
+	var serverName string
+	for i := 0; i < 10; i++ {
+		url := fmt.Sprintf("%s/api/v1/some-data?key=%s", baseAddress, ourTeam)
 
-	for i := 0; i < 9; i++ {
-		resp, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", baseAddress))
-		c.Assert(err, IsNil)
+		resp, err := client.Get(url)
+		assert.Nil(t, err)
+		assert.Equal(t, resp.StatusCode, http.StatusOK)
 
-		c.Assert(resp.StatusCode, Equals, http.StatusOK)
+		body, err := ioutil.ReadAll(resp.Body)
+		assert.Nil(t, err)
+		assert.NotEmpty(t, body)
 
-		if from := resp.Header.Get("lb-from"); srv == "" {
-			srv = from
+		data := string(body)
+		t.Log(fmt.Sprintf("body: %s", data))
+
+		if i == 0 {
+			serverName = resp.Header.Get("lb-from")
 		} else {
-			c.Assert(srv, Equals, from)
+			assert.Equal(t, serverName, resp.Header.Get("lb-from"))
 		}
 	}
+	t.Log(fmt.Sprintf("server name: %s", serverName))
 }
 
-func (s *IntegrationSuite) BenchmarkBalancer(c *C) {
-	for i := 0; i < c.N; i++ {
-		resp, err := client.Get(fmt.Sprintf("%s/api/v1/some-data", baseAddress))
-		c.Assert(err, IsNil)
-		c.Assert(resp.StatusCode, Equals, http.StatusOK)
+func (s *IntegrationSuite) BenchmarkBalancer(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		resp, err := client.Get(fmt.Sprintf("%s/api/v1/some-data?key=%s", baseAddress, ourTeam))
+		assert.Nil(b, err)
+		assert.Equal(b, resp.StatusCode, http.StatusOK)
 	}
 }
+
