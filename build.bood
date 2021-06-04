@@ -29,5 +29,5 @@ go_testedBinary {
     "signal/**/*.go",
     "cmd/db/*.go"
   ],
-  testPkg: "./cmd/db/..."
+  testPkg: "./datastore/..."
 }
