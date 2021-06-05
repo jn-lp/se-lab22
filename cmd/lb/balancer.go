@@ -99,7 +99,7 @@ func (l *LoadBalancer) Proxy(rw http.ResponseWriter, r *http.Request) error {
 	log.Println("fwd", resp.StatusCode, resp.Request.URL)
 	rw.WriteHeader(resp.StatusCode)
 
-	_ = resp.Body.Close()
+	defer resp.Body.Close()
 
 	_, err = io.Copy(rw, resp.Body)
 	if err != nil {

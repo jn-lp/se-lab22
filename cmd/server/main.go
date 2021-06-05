@@ -1,17 +1,24 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/jn-lp/se-lab22/cmd"
 	"github.com/jn-lp/se-lab22/httptools"
 	"github.com/jn-lp/se-lab22/signal"
 )
 
 const (
+	teamName  = "rapid"
+	dbAddress = "http://db:8070"
 	// confResponseDelaySec = "CONF_RESPONSE_DELAY_SEC"
 	confHealthFailure = "CONF_HEALTH_FAILURE"
 )
@@ -24,6 +31,7 @@ func main() {
 	)
 
 	flag.Parse()
+	putTeam()
 
 	h := http.NewServeMux()
 
@@ -53,9 +61,7 @@ func main() {
 				return
 			}
 
-			reqURL := fmt.Sprintf("http://db:8080/db/%s", key)
-
-			resp, err := http.Get(reqURL)
+			resp, err := http.Get(fmt.Sprintf("%s/db/%s", dbAddress, key))
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
 
@@ -83,4 +89,28 @@ func main() {
 	server.Start()
 
 	signal.WaitForTerminationSignal()
+}
+
+func putTeam() {
+	req := cmd.PutRequest{
+		Value: []byte(time.Now().Format("2021-04-25")),
+	}
+
+	reqJSON, err := json.Marshal(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	res, err := http.Post(
+		fmt.Sprintf("%s/db/%s", dbAddress, teamName),
+		"application/json",
+		bytes.NewBuffer(reqJSON),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		log.Fatalf("cannot put timestamp: %s\n", res.Status)
+	}
 }

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/jn-lp/se-lab22/cmd"
 	"github.com/jn-lp/se-lab22/datastore"
 	"github.com/jn-lp/se-lab22/httptools"
 	"github.com/jn-lp/se-lab22/signal"
@@ -17,7 +18,7 @@ import (
 
 func main() {
 	var (
-		port = flag.Int("port", 8080, "server port")
+		port = flag.Int("port", 8070, "server port")
 		dir  = flag.String("dir", ".", "database storage dir")
 	)
 	flag.Parse()
@@ -50,7 +51,7 @@ func main() {
 				return
 			}
 
-			b, err := json.Marshal(GetResponse{Key: key, Value: value})
+			b, err := json.Marshal(cmd.GetResponse{Key: key, Value: value})
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
 
@@ -74,7 +75,7 @@ func main() {
 				return
 			}
 
-			var req PutRequest
+			var req cmd.PutRequest
 
 			if err = json.Unmarshal(body, &req); err != nil {
 				rw.WriteHeader(http.StatusBadRequest)
