@@ -63,6 +63,7 @@ func (s *TestSuite) TestBalancer(c *C) {
 
 		srv, err := lb.pick(URL)
 		c.Assert(err != nil, Equals, test.WithError)
+
 		if !test.WithError {
 			c.Assert(srv, Equals, test.ServersPool[test.ServerIndex])
 		}

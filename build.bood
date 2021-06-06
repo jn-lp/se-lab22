@@ -14,9 +14,20 @@ go_testedBinary {
   pkg: "github.com/jn-lp/se-lab22/cmd/lb",
   srcs: [
     "httptools/**/*.go",
-    "server/**/*.go",
     "signal/**/*.go",
     "cmd/lb/*.go"
   ],
   testPkg: "./cmd/lb/..."
+}
+
+go_testedBinary {
+  name: "db",
+  pkg: "github.com/jn-lp/se-lab22/cmd/db",
+  srcs: [
+    "httptools/**/*.go",
+    "datastore/**/*.go",
+    "signal/**/*.go",
+    "cmd/db/*.go"
+  ],
+  testPkg: "./datastore/..."
 }

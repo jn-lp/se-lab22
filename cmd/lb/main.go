@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"time"
 
@@ -44,6 +43,7 @@ func scheme() string {
 	if *https {
 		return "https"
 	}
+
 	return "http"
 }
 
@@ -53,10 +53,7 @@ func main() {
 	lb := NewLoadBalancer(time.Duration(*timeoutSec) * time.Second)
 	lb.SetServers(serversPool...)
 
-	err := lb.Start(10 * time.Second)
-	if err != nil {
-		fmt.Printf("%v", err)
-	}
+	lb.Start(10 * time.Second)
 
 	frontend := httptools.CreateServer(*port, lb)
 
